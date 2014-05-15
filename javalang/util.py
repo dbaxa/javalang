@@ -1,5 +1,5 @@
+import six
 
-from __future__ import with_statement
 
 class LookAheadIterator(object):
     def __init__(self, iterable):
@@ -16,10 +16,13 @@ class LookAheadIterator(object):
         self.default = value
 
     def next(self):
+        return self.__next__()
+
+    def __next__(self):
         if self.look_ahead:
             self.value = self.look_ahead.pop(0)
         else:
-            self.value = self.iterable.next()
+            self.value = six.next(self.iterable)
 
         if self.markers:
             self.markers[-1].append(self.value)
@@ -39,7 +42,8 @@ class LookAheadIterator(object):
 
         if length <= i:
             try:
-                self.look_ahead.extend([self.iterable.next() for _ in range(length, i + 1)])
+                self.look_ahead.extend([six.next(self.iterable)
+                    for _ in range(length, i + 1)])
             except StopIteration:
                 return self.default
 
@@ -101,6 +105,9 @@ class LookAheadListIterator(object):
         self.default = value
 
     def next(self):
+        return self.__next__()
+
+    def __next__(self):
         try:
             self.value = self.list[self.marker]
             self.marker += 1
@@ -157,64 +164,3 @@ class LookAheadListIterator(object):
         elif self.saved_markers:
             self.saved_markers[-1] = saved
 
-if __name__ == "__main__":
-    i = LookAheadIterator(xrange(0, 10000))
-
-    assert i.next() == 0
-    assert i.next() == 1
-    assert i.next() == 2
-
-    assert i.last() == 2
-
-    assert i.look() == 3
-    assert i.last() == 3
-
-    assert i.look(1) == 4
-    assert i.look(2) == 5
-    assert i.look(3) == 6
-    assert i.look(4) == 7
-
-    assert i.last() == 7
-
-    i.push_marker()
-    i.next() == 3
-    i.next() == 4
-    i.next() == 5
-    i.pop_marker(True) # reset
-
-    assert i.look() == 3
-    assert i.next() == 3
-
-    i.push_marker() #1
-    assert i.next() == 4
-    assert i.next() == 5
-    i.push_marker() #2
-    assert i.next() == 6
-    assert i.next() == 7
-    i.push_marker() #3
-    assert i.next() == 8
-    assert i.next() == 9
-    i.pop_marker(False) #3
-    assert i.next() == 10
-    i.pop_marker(True) #2
-    assert i.next() == 6
-    assert i.next() == 7
-    assert i.next() == 8
-    i.pop_marker(False) #1
-    assert i.next() == 9
-
-    try:
-        with i:
-            assert i.next() == 10
-            assert i.next() == 11
-            raise Exception()
-    except:
-        assert i.next() == 10
-        assert i.next() == 11
-
-    with i:
-        assert i.next() == 12
-        assert i.next() == 13
-    assert i.next() == 14
-
-    print 'All tests passed'
