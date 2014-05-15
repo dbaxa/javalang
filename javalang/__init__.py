@@ -5,4 +5,4 @@ import tokenizer
 import javadoc
 
 
-__version__ = "0.9.4.1"
+__version__ = "0.9.5.1"
