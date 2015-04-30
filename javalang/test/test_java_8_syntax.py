@@ -86,6 +86,13 @@ class LambdaSupportTest(unittest.TestCase):
         with self.assertRaises(parser.JavaSyntaxError):
             parse.parse(setup_java_class("(x, final y) -> x+y;"))
 
+    def test_invalid_parameters_are_invalid(self):
+        """ this tests that invalid lambda parameters are are
+            considered invalid as per the specifications.
+        """
+        with self.assertRaises(parser.JavaSyntaxError):
+            parse.parse(setup_java_class("(a b c) -> {};"))
+
 
 class MethodReferenceSyntaxTest(unittest.TestCase):
     """ Contains tests for java 8 method reference syntax. """
@@ -93,6 +100,10 @@ class MethodReferenceSyntaxTest(unittest.TestCase):
     def test_method_reference(self):
         """ tests that method references are supported. """
         parse.parse(setup_java_class("String::length;"))
+
+    def test_method_reference_to_the_new_method(self):
+        """ test support for method references to 'new'. """
+        parse.parse(setup_java_class("String::new;"))
 
     @unittest.expectedFailure
     def test_method_reference_explicit_type_arguments_for_generic_type(self):
