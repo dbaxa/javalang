@@ -160,6 +160,13 @@ class MethodReferenceSyntaxTest(unittest.TestCase):
         self.assert_contains_method_reference_expression_in_m(
             parse.parse(setup_java_class("String::new;")))
 
+    def test_method_reference_to_the_new_method_with_explict_type(self):
+        """ test support for method references to 'new' with an
+            explicit type.
+        """
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("String::<String> new;")))
+
     def test_method_reference_from_super(self):
         """ test support for method references from 'super'. """
         self.assert_contains_method_reference_expression_in_m(
@@ -173,7 +180,7 @@ class MethodReferenceSyntaxTest(unittest.TestCase):
     @unittest.expectedFailure
     def test_method_reference_explicit_type_arguments_for_generic_type(self):
         """ currently there is no support for method references
-            to an explicit type.
+            for an explicit type.
         """
         self.assert_contains_method_reference_expression_in_m(
             parse.parse(setup_java_class("List<String>::size;")))
@@ -184,6 +191,13 @@ class MethodReferenceSyntaxTest(unittest.TestCase):
         self.assert_contains_method_reference_expression_in_m(
             parse.parse(setup_java_class("Arrays::<String> sort;")))
 
+    @unittest.expectedFailure
+    def test_method_reference_from_array_type(self):
+        """ currently there is no support for method references
+            from a primary type.
+        """
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("int[]::new;")))
 
 
 def main():
