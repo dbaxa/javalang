@@ -1,7 +1,7 @@
 import unittest
 
 from pkg_resources import resource_string
-from .. import parse, parser
+from .. import parse, parser, tree
 
 
 def setup_java_class(content_to_add):
@@ -19,21 +19,50 @@ public class Lambda {
     return template % content_to_add
 
 
+def filter_type_in_method(clazz, the_type, method_name):
+    """ yields the result of filtering the given class for the given
+        type inside the given method identified by its name.
+    """
+    for path, node in clazz.filter(the_type):
+        for p in reversed(path):
+            if isinstance(p, tree.MethodDeclaration):
+                if p.name == method_name:
+                    yield path, node
+
+
 class LambdaSupportTest(unittest.TestCase):
+
     """ Contains tests for java 8 lambda syntax. """
+
+    def assert_contains_lambda_expression_in_m(
+            self, clazz, method_name='main'):
+        """ asserts that the given tree contains a method with the supplied
+            method name containing a lambda expression.
+        """
+        matches = list(filter_type_in_method(
+            clazz, tree.LambdaExpression, method_name))
+        if not matches:
+            self.fail('No matching lambda expression found.')
+        return matches
 
     def test_lambda_support_no_parameters_no_body(self):
         """ tests support for lambda with no parameters and no body. """
-        parse.parse(setup_java_class("() -> {};"))
+        self.assert_contains_lambda_expression_in_m(
+            parse.parse(setup_java_class("() -> {};")))
 
     def test_lambda_support_no_parameters_expression_body(self):
         """ tests support for lambda with no parameters and an
             expression body.
         """
-        parse.parse(setup_java_class("() -> 3;"))
-        parse.parse(setup_java_class("() -> null;"))
-        parse.parse(setup_java_class("() -> { return 21; };"))
-        parse.parse(setup_java_class("() -> { System.exit(1); };"))
+        test_classes = [
+            setup_java_class("() -> 3;"),
+            setup_java_class("() -> null;"),
+            setup_java_class("() -> { return 21; };"),
+            setup_java_class("() -> { System.exit(1); };"),
+        ]
+        for test_class in test_classes:
+            clazz = parse.parse(test_class)
+            self.assert_contains_lambda_expression_in_m(clazz)
 
     def test_lambda_support_no_parameters_complex_expression(self):
         """ tests support for lambda with no parameters and a
@@ -48,29 +77,41 @@ class LambdaSupportTest(unittest.TestCase):
                 return result / 2;
             }
         };"""
-        parse.parse(setup_java_class(code))
+        self.assert_contains_lambda_expression_in_m(
+            parse.parse(setup_java_class(code)))
 
     def test_parameter_no_type_expression_body(self):
         """ tests support for lambda with parameters with inferred types. """
-        parse.parse(setup_java_class("(bar) -> bar + 1;"))
-        parse.parse(setup_java_class("bar -> bar + 1;"))
-        parse.parse(setup_java_class("x -> x.length();"))
-        parse.parse(setup_java_class("y -> { y.boom(); };"))
+        test_classes = [
+            setup_java_class("(bar) -> bar + 1;"),
+            setup_java_class("bar -> bar + 1;"),
+            setup_java_class("x -> x.length();"),
+            setup_java_class("y -> { y.boom(); };"),
+        ]
+        for test_class in test_classes:
+            clazz = parse.parse(test_class)
+            self.assert_contains_lambda_expression_in_m(clazz)
 
     def test_parameter_with_type_expression_body(self):
         """ tests support for lambda with parameters with formal types. """
-        parse.parse(setup_java_class("(int foo) -> { return foo + 2; };"))
-        parse.parse(setup_java_class("(String s) -> s.length();"))
-        parse.parse(setup_java_class("(int foo) -> foo + 1;"))
-        parse.parse(setup_java_class("(Thread th) -> { th.start(); };"))
-        parse.parse(setup_java_class("(String foo, String bar) -> "
-                                     "foo + bar;"))
+        test_classes = [
+            setup_java_class("(int foo) -> { return foo + 2; };"),
+            setup_java_class("(String s) -> s.length();"),
+            setup_java_class("(int foo) -> foo + 1;"),
+            setup_java_class("(Thread th) -> { th.start(); };"),
+            setup_java_class("(String foo, String bar) -> "
+                             "foo + bar;"),
+        ]
+        for test_class in test_classes:
+            clazz = parse.parse(test_class)
+            self.assert_contains_lambda_expression_in_m(clazz)
 
     def test_parameters_with_no_type_expression_body(self):
         """ tests support for multiple lambda parameters
             that are specified without their types.
         """
-        parse.parse(setup_java_class("(x, y) -> x + y;"))
+        self.assert_contains_lambda_expression_in_m(
+            parse.parse(setup_java_class("(x, y) -> x + y;")))
 
     def test_parameters_with_mixed_inferred_and_declared_types(self):
         """ this tests that lambda type specification mixing is considered
@@ -95,27 +136,54 @@ class LambdaSupportTest(unittest.TestCase):
 
 
 class MethodReferenceSyntaxTest(unittest.TestCase):
+
     """ Contains tests for java 8 method reference syntax. """
+
+    def assert_contains_method_reference_expression_in_m(
+            self, clazz, method_name='main'):
+        """ asserts that the given class contains a method with the supplied
+            method name containing a method reference.
+        """
+        matches = list(filter_type_in_method(
+            clazz, tree.MethodReference, method_name))
+        if not matches:
+            self.fail('No matching method reference found.')
+        return matches
 
     def test_method_reference(self):
         """ tests that method references are supported. """
-        parse.parse(setup_java_class("String::length;"))
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("String::length;")))
 
     def test_method_reference_to_the_new_method(self):
         """ test support for method references to 'new'. """
-        parse.parse(setup_java_class("String::new;"))
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("String::new;")))
+
+    def test_method_reference_from_super(self):
+        """ test support for method references from 'super'. """
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("super::toString;")))
+
+    def test_method_reference_from_super_with_identifier(self):
+        """ test support for method references from Identifier.super. """
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("String.super::toString;")))
 
     @unittest.expectedFailure
     def test_method_reference_explicit_type_arguments_for_generic_type(self):
         """ currently there is no support for method references
             to an explicit type.
         """
-        parse.parse(setup_java_class("List<String>::size;"))
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("List<String>::size;")))
 
     def test_method_reference_explicit_type_arguments(self):
         """ test support for method references with an explicit type.
         """
-        parse.parse(setup_java_class("Arrays::<String> sort;"))
+        self.assert_contains_method_reference_expression_in_m(
+            parse.parse(setup_java_class("Arrays::<String> sort;")))
+
 
 
 def main():
